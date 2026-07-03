@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cédula de Notificación Digital - Hospital Pablo Soria</title>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+
+    <style>
+        *, *::before, *::after { box-sizing: border-box; }
+        :root {
+            --color-principal: #0056b3;
+            --color-fondo: #eceff1;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: var(--color-fondo);
+            margin: 0;
+            padding: 10px;
+            font-size: 14px;
+        }
+        .container-ui {
+            max-width: 600px;
+            margin: 0 auto 20px auto;
+            background: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        h2 {
+            text-align: center;
+            color: var(--color-principal);
+            border-bottom: 2px solid var(--color-principal);
+            padding-bottom: 10px;
+            font-size: 18px;
+            margin-top: 0;
+        }
+        .form-section {
+            background: #f0f4f8;
+            border: 1px solid #d0dbe5;
+            padding: 15px;
+            border-radius: 6px;
+            margin-bottom: 15px;
+        }
+        .contenedor-canvas-firma {
+            background: white;
+            border: 2px dashed #cbd5e0;
+            border-radius: 6px;
+            position: relative;
+            margin: 10px 0 8px 0;
+            overflow: hidden;
+            touch-action: none;
+        }
+        #canvasFirma {
+            display: block;
+            background: #ffffff;
+            cursor: crosshair;
+            width: 100%;
+            height: 150px;
+        }
+        .btn-clear-firma {
+            background-color: #e53e3e;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            font-size: 12px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+            display: inline-block;
+        }
+        button.btn-principal {
+            width: 100%;
+            padding: 14px;
+            background-color: #25d366;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        #contenedor-render {
+            position: absolute;
+            left: -9999px;
+            top: 0;
+            width: 190mm;
+        }
+        .hoja-oficio {
+            width: 100%;
+            min-height: 340mm;
+            background: white;
+            color: #000;
+            font-family: Arial, sans-serif;
+            font-size: 14px;
+            line-height: 1.6;
+            padding: 20px 25px;
+        }
+        .encabezado { font-weight: bold; line-height: 1.3; margin-bottom: 25px; }
+        .titulo-cedula { text-align: center; font-weight: bold; text-decoration: underline; margin-bottom: 30px; font-size: 16px; }
+        .cuerpo-texto { text-align: justify; margin-bottom: 25px; text-indent: 30px; }
+        .tabla-firmas {
+            width: 100%;
+            margin-top: 40px;
+            border-collapse: collapse;
+        }
+        .tabla-firmas td { width: 50%; text-align: center; vertical-align: bottom; }
+        .linea-firma { border-top: 1px dotted #000; margin-top: 45px; padding-top: 5px; font-size: 13px; }
+        .firma-img { max-height: 45px; max-width: 100%; display: block; margin: 0 auto; }
+    </style>
+</head>
+<body>
+
+    <div class="container-ui">
+        <h2>Cédula de Notificación Digital</h2>
+        <p style="text-align: center; color: #4a5568;">Por favor confirme sus datos y firme en el recuadro inferior.</p>
+        
+        <div class="form-section">
+            <p><strong>Agente:</strong> <span id="ui_nombre_completo">Cargando...</span></p>
+            <p><strong>CUIL:</strong> <span id="ui_cuil">Cargando...</span></p>
+            <p><strong>Resolución:</strong> <span id="ui_resolucion">Cargando...</span></p>
+            <p><strong>Fecha de Recepción (Hoy):</strong> <span id="ui_fecha_hoy" style="font-weight: bold; color: var(--color-principal);"></span></p>
+        </div>
+
+        <div class="form-section">
+            <label style="font-weight: 600;">Firme con el dedo dentro del recuadro:</label>
+            <div class="contenedor-canvas-firma">
+                <canvas id="canvasFirma"></canvas>
+            </div>
+            <button type="button" class="btn-clear-firma" onclick="limpiarPanelFirma()">Borrar y Reintentar</button>
+        </div>
+
+        <button type="button" class="btn-principal" onclick="procesarYDescargarPDF()">Confirmar y Generar PDF Firmado</button>
+    </div>
+
+    <div id="contenedor-render">
+        <div class="hoja-oficio" id="documento-oficial">
+            <div class="encabezado">
+                MINISTERIO DE SALUD DE LA PROVINCIA DE JUJUY<br>
+                HOSPITAL PABLO SORIA - SAN SALVADOR DE JUJUY
+            </div>
+
+            <div class="titulo-cedula">CÉDULA DE NOTIFICACIÓN ADMINISTRATIVA</div>
+
+            <div class="cuerpo-texto">
+                Por la presente, se notifica formalmente a el/la agente 
+                <strong id="pdf_agente"></strong>, CUIL N° <strong id="pdf_cuil"></strong>, 
+                quien se desempeña en el sector de <span id="pdf_sector"></span> con la función de <span id="pdf_funcion"></span> 
+                (Categoría <span id="pdf_categoria"></span>, Agrupamiento <span id="pdf_agrupamiento"></span>, Carga Horaria: <span id="pdf_carga"></span>), 
+                que mediante **Resolución N° <strong id="pdf_resolucion"></strong>**, se ha dispuesto registrar e informar su 
+                <strong>FALTA CON AVISO</strong> correspondiente al día <strong><span id="pdf_fecha_falta"></span></strong>, de conformidad con las reglamentaciones institucionales vigentes.
+            </div>
+
+            <div class="cuerpo-texto" style="text-indent: 0; margin-top: 40px;">
+                Queda usted formalmente notificado/a. En constancia de recepción, se estampa la firma digital táctil junto con los datos del receptor en el día de la fecha: 
+                <strong><span id="pdf_fecha_recepcion"></span></strong> a las <strong><span id="pdf_hora_recepcion"></span> Hs</strong>.
+            </div>
+
+            <table class="tabla-firmas">
+                <tr>
+                    <td>
+                        <div style="height: 45px;"></div>
+                        <div class="linea-firma">Firma y Sello Responsable RRHH</div>
+                    </td>
+                    <td>
+                        <div style="height: 45px;">
+                            <img id="pdf_imagen_firma" class="firma-img" src="" alt="" style="display:none;">
+                        </div>
+                        <div class="linea-firma">
+                            <strong>Firma del Agente Notificado</strong><br>
+                            Aclaración: <span id="pdf_aclaracion_pie"></span><br>
+                            CUIL: <span id="pdf_cuil_pie"></span>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('canvasFirma');
+        const ctx = canvas.getContext('2d');
+        let dibujando = false;
+        let firmaVacia = true;
+        let datosAgente = {};
+
+        function cargarDatosDesdeURL() {
+            const params = new URLSearchParams(window.location.search);
+            
+            datosAgente = {
+                apellido: params.get('ap') || '',
+                nombre: params.get('nom') || '',
+                cuil: params.get('cuil') || '……',
+                falta: params.get('falta') || '……',
+                res: params.get('res') || '……',
+                sit: params.get('sit') || '',
+                cat: params.get('cat') || '……',
+                agrup: params.get('agrup') || '……',
+                carga: params.get('carga') || '……',
+                func: params.get('func') || '……',
+                sector: params.get('sector') || '……'
+            };
+
+            const nombreCompleto = `${datosAgente.apellido} ${datosAgente.nombre}`.trim() || 'Agente No Identificado';
+            
+            document.getElementById('ui_nombre_completo').innerText = nombreCompleto;
+            document.getElementById('ui_cuil').innerText = datosAgente.cuil;
+            document.getElementById('ui_resolucion').innerText = datosAgente.res;
+
+            const ahora = new Date();
+            const fechaStr = ahora.toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit', year: 'numeric' });
+            const horaStr = ahora.toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit' });
+            
+            document.getElementById('ui_fecha_hoy').innerText = `${fechaStr} - ${horaStr} Hs`;
+
+            document.getElementById('pdf_agente').innerText = nombreCompleto;
+            document.getElementById('pdf_cuil').innerText = datosAgente.cuil;
+            document.getElementById('pdf_sector').innerText = datosAgente.sector;
+            document.getElementById('pdf_funcion').innerText = datosAgente.func;
+            document.getElementById('pdf_categoria').innerText = datosAgente.cat;
+            document.getElementById('pdf_agrupamiento').innerText = datosAgente.agrup;
+            document.getElementById('pdf_carga').innerText = datosAgente.carga;
+            document.getElementById('pdf_resolucion').innerText = datosAgente.res;
+            document.getElementById('pdf_fecha_falta').innerText = datosAgente.falta;
+            
+            document.getElementById('pdf_fecha_recepcion').innerText = fechaStr;
+            document.getElementById('pdf_hora_recepcion').innerText = horaStr;
+            document.getElementById('pdf_aclaracion_pie').innerText = nombreCompleto;
+            document.getElementById('pdf_cuil_pie').innerText = datosAgente.cuil;
+        }
+
+        function inicializarCanvas() {
+            const rect = canvas.getBoundingClientRect();
+            canvas.width = rect.width;
+            canvas.height = 150;
+            ctx.strokeStyle = "#001a4d";
+            ctx.lineWidth = 3;
+            ctx.lineCap = "round";
+            ctx.lineJoin = "round";
+        }
+
+        canvas.addEventListener('mousedown', (e) => { dibujando = true; dibujar(e); });
+        canvas.addEventListener('mousemove', dibujar);
+        window.addEventListener('mouseup', () => dibujando = false);
+        canvas.addEventListener('touchstart', (e) => { dibujando = true; dibujar(e.touches[0]); e.preventDefault(); });
+        canvas.addEventListener('touchend', () => dibujando = false);
+        canvas.addEventListener('touchmove', (e) => { dibujar(e.touches[0]); e.preventDefault(); });
+
+        function dibujar(e) {
+            if (!dibujando) return;
+            const rect = canvas.getBoundingClientRect();
+            const x = (e.clientX || e.pageX) - rect.left;
+            const y = (e.clientY || e.pageY) - rect.top;
+
+            if (e.type === 'touchstart' || dibujando && ctx.pathBegun === false) {
+                ctx.beginPath();
+                ctx.moveTo(x, y);
+                ctx.pathBegun = true;
+            } else {
+                ctx.lineTo(x, y);
+                ctx.stroke();
+                firmaVacia = false;
+            }
+        }
+
+        function limpiarPanelFirma() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.beginPath();
+            firmaVacia = true;
+            document.getElementById('pdf_imagen_firma').style.display = 'none';
+        }
+
+        function procesarYDescargarPDF() {
+            if (firmaVacia) {
+                alert("Por favor, firme en el cuadro antes de guardar.");
+                return;
+            }
+
+            const imgFirmaPdf = document.getElementById('pdf_imagen_firma');
+            imgFirmaPdf.src = canvas.toDataURL('image/png');
+            imgFirmaPdf.style.display = 'block';
+
+            const elementoPdf = document.getElementById('documento-oficial');
+            const nombreArchivo = `Cedula_Notificacion_${datosAgente.cuil}.pdf`;
+
+            const opcionesConfig = {
+                margin: [15, 15, 15, 15],
+                filename: nombreArchivo,
+                image: { type: 'jpeg', quality: 0.98 },
+                html2canvas: { scale: 2, logging: false, useCORS: true },
+                jsPDF: { unit: 'mm', format: 'legal', orientation: 'portrait' }
+            };
+
+            html2pdf().set(opcionesConfig).from(elementoPdf).save();
+        }
+
+        window.addEventListener('load', () => { cargarDatosDesdeURL(); inicializarCanvas(); });
+    </script>
+</body>
+</html>
