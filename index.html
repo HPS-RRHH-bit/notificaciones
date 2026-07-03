@@ -186,6 +186,8 @@
         let dibujando = false;
         let firmaVacia = true;
         let datosAgente = {};
+        let ultimoX = 0;
+        let ultimoY = 0;
 
         function cargarDatosDesdeURL() {
             const params = new URLSearchParams(window.location.search);
@@ -242,48 +244,61 @@
             ctx.lineJoin = "round";
         }
 
-        // --- SISTEMA DE DIBUJO OPTIMIZADO (MOUSE Y TÁCTIL) ---
+        // --- SISTEMA DE COORDENADAS MÁXIMA PRECISIÓN ---
         function obtenerPosicion(e) {
             const rect = canvas.getBoundingClientRect();
-            // Soporte para dedos (Touch) o Mouse
-            const clienteX = e.touches ? e.touches[0].clientX : e.clientX;
-            const clienteY = e.touches ? e.touches[0].clientY : e.clientY;
+            let clienteX, clienteY;
+            
+            if (e.touches && e.touches.length > 0) {
+                clienteX = e.touches[0].clientX;
+                clienteY = e.touches[0].clientY;
+            } else {
+                clienteX = e.clientX;
+                clienteY = e.clientY;
+            }
+            
             return {
                 x: clienteX - rect.left,
                 y: clienteY - rect.top
             };
         }
 
-        function iniciarDibujo(e) {
+        function comenzarTrazo(e) {
             dibujando = true;
             const pos = obtenerPosicion(e);
-            ctx.beginPath();
-            ctx.moveTo(pos.x, pos.y);
-            if (e.type === 'touchstart') e.preventDefault();
+            ultimoX = pos.x;
+            ultimoY = pos.y;
+            if (e.cancelable) e.preventDefault();
         }
 
-        function moverDibujo(e) {
+        function dibujarTrazo(e) {
             if (!dibujando) return;
             const pos = obtenerPosicion(e);
+            
+            ctx.beginPath();
+            ctx.moveTo(ultimoX, ultimoY);
             ctx.lineTo(pos.x, pos.y);
             ctx.stroke();
+            
+            ultimoX = pos.x;
+            ultimoY = pos.y;
             firmaVacia = false;
-            if (e.type === 'touchmove') e.preventDefault();
+            if (e.cancelable) e.preventDefault();
         }
 
-        function detenerDibujo() {
+        function finalizarTrazo() {
             dibujando = false;
         }
 
-        // Eventos Mouse
-        canvas.addEventListener('mousedown', iniciarDibujo);
-        canvas.addEventListener('mousemove', moverDibujo);
-        window.addEventListener('mouseup', detenerDibujo);
+        // Conexión limpia de eventos independientes
+        canvas.addEventListener('mousedown', comenzarTrazo);
+        canvas.addEventListener('mousemove', dibujarTrazo);
+        window.addEventListener('mouseup', finalizarTrazo);
 
-        // Eventos Pantalla Táctil (Celulares) - CORREGIDOS
-        canvas.addEventListener('touchstart', iniciarDibujo, { passive: false });
-        canvas.addEventListener('touchmove', moverDibujo, { passive: false });
-        window.addEventListener('touchend', detenerDibujo);
+        canvas.addEventListener('touchstart', comenzarTrazo, { passive: false });
+        canvas.addEventListener('touchmove', dibujarTrazo, { passive: false });
+        window.addEventListener('touchend', finalizarTrazo);
+        canvas.addEventListener('touchcancel', finalizarTrazo);
 
         function limpiarPanelFirma() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
